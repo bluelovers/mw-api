@@ -124,10 +124,15 @@
 
 					options = new Object();
 				}
-				else
+
+				if (typeof filename === 'object')
 				{
-					url = options.url;
+					$.extend(options, filename);
+
+					delete filename;
 				}
+
+				url = url || options.url;
 
 				delete options.url;
 
