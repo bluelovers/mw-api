@@ -18,9 +18,14 @@
 			return new uClass.fn.initialize(option);
 		}
 
+		uClass.init = function (params)
+		{
+			return register('mwApiSc', uClass());
+		};
+
 		uClass.fn = uClass.prototype.fn = extend(uClass.prototype, {
 
-			_name_: 'mwApiSc',
+			_name_: 'mwApiScClass',
 
 			isReady: true,
 
