@@ -87,6 +87,11 @@
 					ext = this.getExtByMime(mime);
 				}
 
+				if (!ext)
+				{
+					ext = (url.match(/((?:\.[a-z0-9]{1,4})+)$/i) || [])[0];
+				}
+
 				if (file)
 				{
 					file = file + ext;
@@ -218,6 +223,10 @@
 				return dtd.promise();
 			},
 
+			/**
+			 * https://phabricator.wikimedia.org/diffusion/MW/browse/master/resources/src/mediawiki.api/mediawiki.api.upload.js
+			 * https://www.mediawiki.org/wiki/API:Upload
+			 **/
 			upload: function (data, options, dtd)
 			{
 				var _self = this;
@@ -345,6 +354,26 @@
 				return !!((Promise && dtd instanceof Promise) || ((type === 'object' || type === 'function') && typeof dtd.reject === 'function' && typeof dtd.resolve === 'function'))
 			},
 
+			debug: function (flag)
+			{
+				if (flag === undefined)
+				{
+					return this.mw().config.get('debug');
+				}
+
+				flag = !!flag;
+
+				var options = {
+					expires : 1,
+					path : '/',
+				};
+
+				this.mw().config.set('debug', flag);
+				$.cookie("resourceLoaderDebug", flag, options);
+
+				return this;
+			},
+
 		});
 
 		uClass.fn.initialize.prototype = uClass.fn;
@@ -387,6 +416,36 @@
 
 		return obj;
 	};
+
+	function mwApiClass (options)
+	{
+		if (mwApiClass.prototype.isReady)
+		{
+			return new mwApiClass.fn.initialize(option);
+		}
+
+		mwApiClass.fn = mwApiClass.prototype.fn = extend(mwApiClass.prototype, {
+
+			//_name_: '',
+
+			isReady: true,
+
+			_default: {
+				format: 'json',
+			},
+
+			initialize: function(option)
+			{
+				var _self = this;
+
+				_self.option = $.extend(
+				{}, this._default,
+				{}, option);
+
+				return _self;
+			},
+		});
+	}
 
 	function _ajax_hack()
 	{
