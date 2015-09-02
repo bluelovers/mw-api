@@ -410,7 +410,7 @@
 
 					timeout: 1000,
 
-					cache: false,
+					//cache: false,
 
 				}).done(function(data)
 				{
