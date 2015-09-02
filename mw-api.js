@@ -500,11 +500,11 @@
 							}
 						});
 
-						dtd.resolveWith(_self, lang, licenses);
-
 						_self.setCache('licenses', licenses, lang);
+
+						dtd.resolveWith(_self, lang, licenses);
 					})
-					.fail(function (params)
+					.fail(function ()
 					{
 						dtd.rejectWith(_self, lang);
 					})
