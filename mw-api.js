@@ -43,9 +43,13 @@
 				{}, this._default,
 				{}, option);
 
+				this._cache_ = new Object();
+
 				$.each([
 					'wgScriptPath',
 					'wgScriptExtension',
+
+					'wgUserLanguage',
 				], function(i, v)
 				{
 					if (_self.option[v] === null || _self.option[v] === undefined)
@@ -223,6 +227,21 @@
 				return dtd.promise();
 			},
 
+			api: function (options)
+			{
+				var _self = this;
+
+				options.data = $.extend({
+					'format': _self.option.format,
+				}, options.data);
+
+				return $.ajax($.extend(
+				{
+					url: _self.wikiScript('api'),
+					type: 'GET',
+				}, options, {}));
+			},
+
 			/**
 			 * https://phabricator.wikimedia.org/diffusion/MW/browse/master/resources/src/mediawiki.api/mediawiki.api.upload.js
 			 * https://www.mediawiki.org/wiki/API:Upload
@@ -372,6 +391,99 @@
 				$.cookie("resourceLoaderDebug", flag, options);
 
 				return this;
+			},
+
+			loadMessages: function (messages, lang, wait)
+			{
+				var _self = this;
+
+				return _self.api({
+
+					data: {
+						action: 'query',
+						meta: 'allmessages',
+						amlang: (lang = lang || _self.option['wgUserLanguage']),
+						ammessages: $.isArray(messages) ? messages.join('|') : messages,
+					},
+
+					async: !wait,
+
+					timeout: 1000,
+
+					cache: false,
+
+				}).done(function(data)
+				{
+					_self._init_messages(lang);
+
+					$.each(data.query.allmessages, function(index, message)
+					{
+						if (message.missing !== '')
+						{
+							_self._cache_.messages[lang].set(message.name, message['*']);
+						}
+						else
+						{
+							_self._cache_.messages_missing.set(message.name, false);
+						}
+					});
+				});
+			},
+
+			/**
+			 * https://phabricator.wikimedia.org/diffusion/MW/browse/master/resources/src/mediawiki/mediawiki.js
+			 **/
+			_init_messages: function (lang)
+			{
+				var _self = this;
+
+				var lang = lang || _self.option['wgUserLanguage'];
+
+				_self._cache_.messages = _self._cache_.messages || {};
+
+				var mw = _self.mw();
+
+				_self._cache_.messages_missing = _self._cache_.messages_missing || new mw.Map();
+
+				if (!_self._cache_.messages[lang])
+				{
+					if (lang == _self.option['wgUserLanguage'])
+					{
+						_self._cache_.messages[lang] = _self.mw().messages = _self.mw().messages || new mw.Map();
+					}
+					else
+					{
+						_self._cache_.messages[lang] = new mw.Map();
+					}
+				}
+			},
+
+			msg: function ()
+			{
+				var _self = this;
+
+				var args = Array.prototype.slice.call(arguments, 0) || [];
+
+				args.unshift(_self.option['wgUserLanguage']);
+
+				return this.msgWithLang.apply(this, args);
+			},
+
+			msgWithLang: function (lang)
+			{
+				var _self = this;
+
+				var args = Array.prototype.slice.call(arguments, 0) || [];
+				var lang = args.shift() || _self.option['wgUserLanguage'];
+
+				_self._init_messages(lang);
+
+				if (!_self._cache_.messages[lang].exists(args[0]) && !_self._cache_.messages_missing.exists(args[0]))
+				{
+					_self.loadMessages(args[0], lang, true);
+				}
+
+				return _self.mw().message.apply(_self._cache_.messages[lang], args).toString();
 			},
 
 		});
