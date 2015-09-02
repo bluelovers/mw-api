@@ -48,7 +48,9 @@
 				{}, this._default,
 				{}, option);
 
-				this._cache_ = new Object();
+				this._cache_ = {
+					i18n: {},
+				};
 
 				$.each([
 					'wgScriptPath',
@@ -435,6 +437,92 @@
 				});
 			},
 
+			setCache: function (key, value, lang)
+			{
+				var _self = this;
+				var lang = lang || _self.option['wgUserLanguage'];
+
+				(_self._cache_.i18n[lang] = _self._cache_.i18n[lang] || {})[key] = value;
+
+				return _self;
+			},
+
+			getCache: function (key, defvalue, lang)
+			{
+				var _self = this;
+				var lang = lang || _self.option['wgUserLanguage'];
+
+				var value = (_self._cache_.i18n[lang] = _self._cache_.i18n[lang] || {})[key];
+
+				if (defvalue !== undefined && value === undefined)
+				{
+					value = defvalue;
+				}
+
+				return value;
+			},
+
+			loadLicenses: function (lang, done, fail)
+			{
+				var _self = this;
+				var lang = lang || _self.option['wgUserLanguage'];
+
+				var dtd = $.Deferred();
+
+				var ajaxdtd = _self.loadMessages('Licenses', lang, !true);
+
+				ajaxdtd
+					.done(function (result, textStatus, jqXHR)
+					{
+						var licenses = {}, up = 'none';
+
+						$.each(_self.msgWithLang(lang, 'Licenses').split('\n'), function (i, v)
+						{
+							if (!v) return true;
+
+							if (v.indexOf('** ') === 0)
+							{
+								v = v.replace('** ', '').split('|');
+
+								licenses[up].value[i] = {
+									key: v[0],
+									value: v[1],
+								};
+							}
+							else
+							{
+								up = i;
+
+								licenses[up] = $.extend(true, licenses[up], {
+									key: v.replace('* ', ''),
+									value: {},
+								});
+							}
+						});
+
+						dtd.resolveWith(_self, lang, licenses);
+
+						_self.setCache('licenses', licenses, lang);
+					})
+					.fail(function (params)
+					{
+						dtd.rejectWith(_self, lang);
+					})
+				;
+
+				if ($.isFunction(done))
+				{
+					dtd.done(done);
+				}
+
+				if ($.isFunction(fail))
+				{
+					dtd.fail(fail);
+				}
+
+				return dtd.promise();
+			},
+
 			/**
 			 * https://phabricator.wikimedia.org/diffusion/MW/browse/master/resources/src/mediawiki/mediawiki.js
 			 **/
@@ -454,7 +542,7 @@
 				{
 					if (lang == _self.option['wgUserLanguage'])
 					{
-						_self._cache_.messages[lang] = _self.mw().messages = _self.mw().messages || new mw.Map();
+						_self._cache_.messages[lang] = mw.messages = mw.messages || new mw.Map();
 					}
 					else
 					{
