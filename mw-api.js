@@ -114,29 +114,30 @@
 				}
 			},
 
-			uploadFromUrl2: function (options, filename, text)
+			uploadFromUrl2: function (data, filename, text)
 			{
 				var _self = this, url;
 
-				if (typeof options !== 'object')
+				if (typeof data !== 'object')
 				{
-					url = options + '';
+					url = data + '';
 
-					options = new Object();
+					data = new Object();
 				}
 
 				if (typeof filename === 'object')
 				{
-					$.extend(options, filename);
+					$.extend(data, filename);
 
 					delete filename;
+					filename = undefined;
 				}
 
-				url = url || options.url;
+				url = url || data.url;
 
-				delete options.url;
+				delete data.url;
 
-				options.text = text || options.text;
+				data.text = text || data.text;
 
 				var dtd = jQuery.Deferred();
 
@@ -151,13 +152,18 @@
 					//responseType:'blob',
 				}).done(function(result, textStatus, jqXHR)
 				{
+					/*
 					var type = jqXHR.getResponseHeader('Content-Type');
 					var blob = new Blob([result],
 					{
 						type: type
 					});
+					*/
 
-					options.filename = filename || options.filename || _self.getUrlFilename(url, type);
+					var type = result.type;
+					var blob = result;
+
+					data.filename = filename || data.filename || _self.getUrlFilename(url, type);
 
 					// do something with binary data
 					var _data = $.extend({
@@ -165,70 +171,185 @@
 						comment: 'upload by ' + uClass.fn._name_,
 						text: 'source: ' + url + "\n\n" + 'upload by ' + uClass.fn._name_,
 
-					}, options, {
+					}, data, {
+						/*
 						'token': _self.tokens('editToken'),
 						'format': _self.option.format,
 						'action': 'upload',
+						*/
 						//'filename': options.filename,
 						//'url': 'http://www.google.com/intl/en_ALL/images/logo.gif',
-						'file': result,
-						//'file': blob,
+						//'file': result,
+						'file': blob,
 						//'file':  new Blob([result])
 						//'stash': 1,
+
+						//ignorewarnings: true,
 					});
+
+					var options = {
+						processData: false,
+						contentType: false,
+
+						ignorewarnings: _data.ignorewarnings,
+					};
+
+					_data.ignorewarnings = undefined;
+					delete _data.ignorewarnings;
+
 					var fd = new FormData();
 					for (var i in _data)
 					{
-						/*
-						console.log([fd,
-							i,
-							_data[i]
-						]);
-						*/
 						fd.append(i, _data[i]);
 					}
 
 					console.log([_data,
 						fd,
 						result,
+						blob,
 						textStatus,
 						jqXHR,
 						type
 					]);
 
-					$.ajax(
-					{
-						url: _self.wikiScript('api'),
-						//method: 'POST',
-						type: 'POST',
-						data: fd,
-						//data: _data,
-						processData: false,
-						contentType: false,
-					}).always(function(data, textStatus, jqXHR)
-					{
-						console.log([data,
-							textStatus,
-							jqXHR
-						]);
-
-						if (data.upload && data.upload.result == 'Success')
-						{
-							dtd.resolve();
-						}
-						else
-						{
-							deferred.reject();
-						}
-					});
+					_self.upload(fd, options, dtd);
 				});
 
 				return dtd.promise();
 			},
 
+			upload: function (data, options, dtd)
+			{
+				var _self = this;
+
+				if (_self.isDeferred(options))
+				{
+					dtd = options;
+					options = new Object();
+				}
+
+				if (dtd === undefined)
+				{
+					dtd = jQuery.Deferred();
+				}
+
+				var _default = {
+					'token': _self.tokens('editToken'),
+					'format': _self.option.format,
+					'action': 'upload',
+				};
+
+				var filename;
+
+				if (data instanceof FormData)
+				{
+					$.each(_default, function (i, v) {
+						data.set(i, v);
+					});
+
+					filename = data.get('filename');
+				}
+				else
+				{
+					data = $.extend(data, _default);
+
+					filename = data.filename;
+				}
+
+				delete options.data;
+
+				options = $.extend(
+				{
+					url: _self.wikiScript('api'),
+					type: 'POST',
+					data: data,
+					processData: false,
+					contentType: false,
+				}, options, {});
+
+				console.log([options, data]);
+
+				$.ajax(options).always(function(result, textStatus, jqXHR)
+				{
+					console.log([result,
+						textStatus,
+						jqXHR
+					]);
+
+					/*
+					result.upload.warnings = {
+						'was-deleted': filename,
+						'duplicate-archive': filename,
+						exists: filename,
+					};
+					*/
+
+					if (result.upload && result.upload.result === 'Success')
+					{
+						dtd.resolve(result, textStatus, jqXHR);
+					}
+					else if (options.ignorewarnings && result.upload && result.upload.result === 'Warning' && result.upload.warnings)
+					{
+						var ignorewarnings = !!(options.ignorewarnings === 'all' || options.ignorewarnings === true);
+
+						if (!ignorewarnings)
+						{
+							$.each(result.upload.warnings, function (i, v)
+							{
+								var flag = typeof options.ignorewarnings[i] === 'function' ? options.ignorewarnings[i].call(_self, i, v, options, result) : options.ignorewarnings[i];
+
+								console.log([i, v, options.ignorewarnings[i], flag]);
+
+								if (flag !== true)
+								{
+									return ignorewarnings = false;
+								}
+							});
+						}
+
+						console.log([ignorewarnings, options.ignorewarnings]);
+
+						if (ignorewarnings)
+						{
+							delete options.ignorewarnings;
+
+							_self.upload({
+
+								filekey: result.upload.filekey,
+								sessionkey: result.upload.sessionkey || result.upload.filekey,
+
+								ignorewarnings: ignorewarnings,
+
+								filename: filename,
+
+							}, options, dtd);
+						}
+						else
+						{
+							dtd.resolve(result, textStatus, jqXHR);
+						}
+					}
+					else
+					{
+						dtd.reject(result, textStatus, jqXHR);
+					}
+				});
+
+				return dtd.promise();
+			},
+
+			isDeferred: function (dtd)
+			{
+				var type = $.type(dtd);
+
+				return !!((Promise && dtd instanceof Promise) || ((type === 'object' || type === 'function') && typeof dtd.reject === 'function' && typeof dtd.resolve === 'function'))
+			},
+
 		});
 
 		uClass.fn.initialize.prototype = uClass.fn;
+
+		uClass.name = uClass.fn.initialize.name = uClass.fn._name_;
 	};
 
 	function register(name, obj)
