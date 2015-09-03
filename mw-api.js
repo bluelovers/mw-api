@@ -652,6 +652,58 @@
 					});
 			},
 
+			/**
+			 * https://www.mediawiki.org/wiki/API:Parsing_wikitext
+			 **/
+			parse: function (text, options, done, wait)
+			{
+				var _self = this;
+
+				if (done === true || done === false)
+				{
+					wait = !!done;
+
+					done = undefined;
+
+					delete done;
+				}
+
+				var dtd = $.Deferred();
+
+				_self
+					.api({
+						async: !wait,
+					}, options = $.extend({
+						action: 'parse',
+
+						text: text,
+
+						prop: prop || 'text',
+					}, options))
+					.done(function (data)
+					{
+						if ('text' in data.parse)
+						{
+							dtd.resolveWith(_self, [options, data, data.parse.text['*']]);
+						}
+						else
+						{
+							dtd.rejectWith(_self, [options, data]);
+						}
+					})
+					.fail(function ()
+					{
+						dtd.rejectWith(_self, [options, data]);
+					})
+				;
+
+				if ($.isFunction(done))
+				{
+					dtd.done(done);
+				}
+
+				return dtd.promise();
+			},
 		});
 
 		uClass.fn.initialize.prototype = uClass.fn;
