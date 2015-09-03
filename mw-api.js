@@ -668,9 +668,19 @@
 					delete done;
 				}
 
+				var title;
+
+				if (typeof options === 'string')
+				{
+					title = options + '';
+
+					options = {};
+				}
+
 				var options = $.extend({
 					action: 'parse',
 
+					title: title,
 					text: text,
 
 					prop: 'text',
@@ -698,6 +708,84 @@
 						if ('text' in data.parse)
 						{
 							dtd.resolveWith(_self, [options, data, data.parse.text['*']]);
+						}
+						else
+						{
+							dtd.rejectWith(_self, [options, data]);
+						}
+					})
+					.fail(function ()
+					{
+						dtd.rejectWith(_self, [options, data]);
+					})
+				;
+
+				if ($.isFunction(done))
+				{
+					dtd.done(done);
+				}
+
+				return dtd.promise();
+			},
+
+			edit: function (text, options, done, wait)
+			{
+				var _self = this;
+
+				if (done === true || done === false)
+				{
+					wait = !!done;
+
+					done = undefined;
+
+					delete done;
+				}
+
+				var title;
+
+				if (typeof options === 'string')
+				{
+					title = options + '';
+
+					options = {};
+				}
+
+				var options = $.extend({}, {
+					action: 'edit',
+
+					title: title,
+					text: text || undefined,
+
+					redirect: true,
+
+					bot: true,
+
+					token: _self.tokens('editToken'),
+
+				}, options);
+
+				if (options.pageid)
+				{
+					delete options.title;
+				}
+				else if (!options.title)
+				{
+					options.title = 'Special:MyPage/Sandbox';
+				}
+
+				var dtd = $.Deferred();
+
+				_self
+					.api({
+						type: 'POST',
+
+						async: !wait,
+					}, options)
+					.done(function (data)
+					{
+						if (!data.warnings && !data.error && data.edit.result === 'Success')
+						{
+							dtd.resolveWith(_self, [options, data]);
 						}
 						else
 						{
