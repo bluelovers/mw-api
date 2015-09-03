@@ -57,6 +57,7 @@
 					'wgScriptExtension',
 
 					'wgUserLanguage',
+					'wgContentLanguage',
 				], function(i, v)
 				{
 					if (_self.option[v] === null || _self.option[v] === undefined)
@@ -234,13 +235,15 @@
 				return dtd.promise();
 			},
 
-			api: function (options)
+			api: function (options, data)
 			{
 				var _self = this;
 
+				var options = $.extend({}, options, {});
+
 				options.data = $.extend({
 					'format': _self.option.format,
-				}, options.data);
+				}, options.data, data);
 
 				return $.ajax($.extend(
 				{
@@ -587,6 +590,61 @@
 				}
 
 				return _self.mw().message.apply(_self._cache_.messages[lang], args).toString();
+			},
+
+			/**
+			 * @param {string} username
+			 * @param {string} password
+			 * @return {jQuery.Promise} See mw.Api#post
+			 *
+			 * https://doc.wikimedia.org/mediawiki-core/master/js/source/mediawiki.api.login.html#mw-Api-plugin-login
+			 */
+			login: function(username, password)
+			{
+				var params, apiPromise, innerPromise,
+					_self = this;
+
+				params = {
+					action: 'login',
+					lgname: username,
+					lgpassword: password
+				};
+
+				apiPromise = _self.api({
+					type: 'POST',
+				}, params);
+
+				return apiPromise
+					.then(function(data)
+					{
+						params.lgtoken = data.login.token;
+						innerPromise = _self.api({
+								type: 'POST',
+							}, params)
+							.then(function(data)
+							{
+								var code;
+								if (data.login.result !== 'Success')
+								{
+									// Set proper error code whenever possible
+									code = data.error && data.error.code || 'unknown';
+									return $.Deferred().rejectWith(_self, [code, data]);
+								}
+								return data;
+							});
+						return innerPromise;
+					})
+					.promise(
+					{
+						abort: function()
+						{
+							apiPromise.abort();
+							if (innerPromise)
+							{
+								innerPromise.abort();
+							}
+						}
+					});
 			},
 
 		});
