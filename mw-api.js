@@ -9,13 +9,18 @@
 	_ajax_hack();
 	uClass();
 
-	return register(uClass.fn._name_, uObject = uClass);
+	return register(uClass.fn._name_, uClass);
 
 	function uClass(option)
 	{
 		if (uClass.prototype.isReady)
 		{
-			return new uClass.fn.initialize(option);
+			if (option === undefined && uObject instanceof uClass)
+			{
+				return uObject;
+			}
+
+			return uObject = new uClass.fn.initialize(option);
 		}
 
 		uClass.init = function (params)
