@@ -474,7 +474,7 @@
 				ajaxdtd
 					.done(function (result, textStatus, jqXHR)
 					{
-						var licenses = {}, up = 'none';
+						var licenses = new treeMapClass(), up = 'none';
 
 						$.each(_self.msgWithLang(lang, 'Licenses').split('\n'), function (i, v)
 						{
@@ -484,29 +484,39 @@
 							{
 								v = v.replace('** ', '').split('|');
 
+								/*
 								licenses[up].value[i] = {
 									key: v[0],
 									value: v[1],
 								};
+								*/
+
+								licenses.sub(up, i, v[0], v[1]);
 							}
 							else
 							{
+								/*
 								up = i;
 
 								licenses[up] = $.extend(true, licenses[up], {
 									key: v.replace('* ', ''),
 									value: {},
 								});
+								*/
+
+								licenses.up(up = i, v.replace('* ', ''));
 							}
 						});
 
 						_self.setCache('licenses', licenses, lang);
 
-						dtd.resolveWith(_self, lang, licenses);
+						console.log(['licenses', lang, licenses]);
+
+						dtd.resolveWith(_self, [lang, licenses]);
 					})
 					.fail(function ()
 					{
-						dtd.rejectWith(_self, lang);
+						dtd.rejectWith(_self, [lang]);
 					})
 				;
 
@@ -621,6 +631,65 @@
 
 		return obj;
 	};
+
+	function treeMapClass (data)
+	{
+		$,extend(this, {
+			data: $.extend({}, data, {}),
+
+			up: function (fid, key, value)
+			{
+				return this.data[fid] = this.data[fid] || this._item(key, value || {});
+			},
+
+			sub: function (fid, id, key, value)
+			{
+				var up = this.up(fid);
+
+				return up.value[id] = this._item(key, value);
+			},
+
+			_item: function (key, value)
+			{
+				return {
+					key: key,
+					value: value,
+				};
+			},
+
+			toSelect: function (params)
+			{
+				var select = $('<select/>');
+
+				var optgroup = $('<option selected/>')
+					.appendTo(select)
+				;
+
+				$.each(this.data, function(fid, data)
+				{
+					var optgroup = $('<optgroup/>')
+						.attr('label', data.key)
+						.appendTo(select)
+					;
+
+					$.each(data.value, function(id, value)
+					{
+						//console.log(id, value);
+
+						var option = $('<option/>')
+							.val(value.key)
+							.text(value.value)
+							.appendTo(optgroup)
+						;
+					});
+				});
+
+				return select;
+			},
+		});
+
+		return this;
+	}
 
 	function mwApiClass (options)
 	{
