@@ -668,18 +668,31 @@
 					delete done;
 				}
 
+				var options = $.extend({
+					action: 'parse',
+
+					text: text,
+
+					prop: 'text',
+
+					redirects: true,
+				}, options);
+
+				if (options.page || options.pageid)
+				{
+					delete options.text;
+				}
+				else
+				{
+					options.text = text;
+				}
+
 				var dtd = $.Deferred();
 
 				_self
 					.api({
 						async: !wait,
-					}, options = $.extend({
-						action: 'parse',
-
-						text: text,
-
-						prop: prop || 'text',
-					}, options))
+					}, options)
 					.done(function (data)
 					{
 						if ('text' in data.parse)
